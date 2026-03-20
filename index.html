@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ankit's Pro IoT Hub - Ultimate</title>
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; text-align: center; margin: 0; padding: 10px; overflow: hidden; }
+        .status-bar { font-size: 0.8rem; margin-bottom: 10px; font-weight: bold; }
+        .stats-row { display: flex; justify-content: center; gap: 15px; margin-bottom: 15px; }
+        .card { background: #1e293b; padding: 15px; border-radius: 12px; width: 130px; border-bottom: 4px solid #38bdf8; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .value { font-size: 2rem; font-weight: bold; color: #38bdf8; }
+        .chart-box { background: #1e293b; padding: 15px; border-radius: 20px; max-width: 850px; margin: 0 auto; height: 320px; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
+        .controls { margin-top: 15px; display: flex; justify-content: center; gap: 10px; }
+        .btn { border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer; color: white; font-weight: bold; font-size: 0.8rem; transition: 0.3s; }
+        
+        .side-drawer { position: fixed; top: 0; right: -420px; width: 400px; height: 100%; background: #1e293b; transition: 0.4s; z-index: 1000; display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.6); }
+        .side-drawer.open { right: 0; }
+        .drawer-header { padding: 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #1e293b; }
+        .table-container { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; color: #cbd5e1; }
+        .history-table th, .history-table td { border: 1px solid #334155; padding: 10px; text-align: center; }
+        .history-table th { background: #0f172a; color: #38bdf8; position: sticky; top: 0; }
+        .refresh-btn { color: #3b82f6; cursor: pointer; font-size: 1.4rem; transition: 0.3s; }
+        .refresh-btn:hover { transform: rotate(180deg); color: #60a5fa; }
+    </style>
+</head>
+<body>
+
+    <h3 style="margin: 10px 0;">🌍 Ankit's Global IoT Hub</h3>
+    <div class="status-bar" id="status-text" style="color: #22c55e;">● Live Connection Ready</div>
+
+    <div class="stats-row">
+        <div class="card" style="border-color:#f43f5e">Temp<div class="value" id="v-t">--</div><small>°C</small></div>
+        <div class="card" style="border-color:#0ea5e9">Hum<div class="value" id="v-h">--</div><small>%</small></div>
+    </div>
+
+    <div class="chart-box"><canvas id="myChart"></canvas></div>
+
+    <div class="controls">
+        <button class="btn" style="background:#3b82f6" onclick="fetchHistory()"><i class="fa-solid fa-clock-rotate-left"></i> HISTORY</button>
+        <button class="btn" style="background:#22c55e" onclick="downloadFullReport()"><i class="fa-solid fa-file-csv"></i> FULL REPORT</button>
+        <button class="btn" style="background:#f43f5e" onclick="location.reload()"><i class="fa-solid fa-rotate-right"></i> REFRESH HUB</button>
+    </div>
+
+    <div id="historyDrawer" class="side-drawer">
+        <div class="drawer-header">
+            <h3>IST History</h3>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <i class="fa-solid fa-rotate refresh-btn" onclick="fetchHistory(true)" title="Refresh History"></i>
+                <i class="fa-solid fa-circle-xmark" style="color:#f43f5e; cursor:pointer; font-size:1.6rem;" onclick="closeHistory()"></i>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="history-table">
+                <thead><tr><th>Time (IST)</th><th>Temp</th><th>Hum</th></tr></thead>
+                <tbody id="historyBody"></tbody>
+            </table>
+        </div>
+        <div style="padding: 15px;"><button class="btn" style="background:#f43f5e; width: 100%;" onclick="closeHistory()">CLOSE PANEL</button></div>
+    </div>
+
+    <script>
+        var labels = [], temps = [], hums = [];
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1_i_YidrwDdyhPmpN7uvQF0cZ4LzK_uNcrkxnD4P6OTqdsnoJl-A_o6y3Fnq9vxvyyQ/exec";
+        
+        var chart = new Chart(document.getElementById('myChart'), {
+            type: 'line',
+            data: { labels: [], datasets: [
+                {label:'Temp', borderColor:'#f43f5e', data:[], tension: 0.4, fill: true, backgroundColor: 'rgba(244, 63, 94, 0.1)'},
+                {label:'Hum', borderColor:'#0ea5e9', data:[], tension: 0.4, fill: true, backgroundColor: 'rgba(14, 165, 233, 0.1)'}
+            ]},
+            options: { maintainAspectRatio: false }
+        });
+
+        // Ise abhi khali chhodein, Render se link milne par yahan daalenge
+        const socket = io("https://your-app-name.onrender.com");
+        socket.on("iot_update", (data) => {
+            const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
+            document.getElementById('v-t').innerText = parseFloat(data.temp).toFixed(1);
+            document.getElementById('v-h').innerText = parseFloat(data.hum).toFixed(1);
+
+            labels.push(time); temps.push(data.temp); hums.push(data.hum);
+            if(labels.length > 20) { labels.shift(); temps.shift(); hums.shift(); }
+            chart.data.labels = labels; chart.data.datasets[0].data = temps; chart.data.datasets[1].data = hums;
+            chart.update('none');
+        });
+
+        async function fetchHistory(isRef = false) {
+            const body = document.getElementById('historyBody');
+            document.getElementById('historyDrawer').classList.add('open');
+            if(!isRef) body.innerHTML = "<tr><td colspan='3'>Syncing...</td></tr>";
+            try {
+                let res = await fetch(SCRIPT_URL + "?nocache=" + new Date().getTime());
+                let data = await res.json();
+                body.innerHTML = "";
+                data.reverse().forEach(r => {
+                    let t = r.time;
+                    if(t.includes('T')) t = new Date(t).toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
+                    body.innerHTML += `<tr><td>${t}</td><td>${parseFloat(r.temp).toFixed(1)}</td><td>${parseFloat(r.hum).toFixed(1)}</td></tr>`;
+                });
+            } catch(e) { body.innerHTML = "<tr><td colspan='3'>Error</td></tr>"; }
+        }
+
+        async function downloadFullReport() {
+            const status = document.getElementById('status-text');
+            status.innerText = "⏳ Fetching full report from Sheets...";
+            status.style.color = "#3b82f6";
+            try {
+                let res = await fetch(SCRIPT_URL + "?nocache=" + new Date().getTime());
+                let data = await res.json();
+                if(data.length > 0) {
+                    var csv = 'Time (IST),Temp,Hum\n';
+                    data.forEach(r => {
+                        let t = r.time;
+                        if(t.includes('T')) t = new Date(t).toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
+                        csv += `${t},${r.temp},${r.hum}\n`;
+                    });
+                    var blob = new Blob(['\ufeff'+csv], {type:'text/csv'});
+                    var a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+                    a.download = `Full_Report_${new Date().toLocaleDateString('en-IN')}.csv`; a.click();
+                    status.innerText = "✅ Report Downloaded!";
+                }
+            } catch(e) { status.innerText = "❌ Download Failed"; }
+            setTimeout(() => { status.innerText = "● Live Connection Ready"; status.style.color = "#22c55e"; }, 3000);
+        }
+
+        function closeHistory() { document.getElementById('historyDrawer').classList.remove('open'); }
+    </script>
+</body>
+</html>
