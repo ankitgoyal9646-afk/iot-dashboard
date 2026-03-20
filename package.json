@@ -1,19 +1,14 @@
 {
-  "name": "dht-sensor",
+  "name": "ankit-iot-hub",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "axios": "^1.13.6",
-    "express": "^5.2.1",
-    "mqtt": "^5.15.0",
-    "socket.io": "^4.8.3"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4",
+    "mqtt": "^5.3.4",
+    "axios": "^1.6.7"
   }
 }
