@@ -3,17 +3,23 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 const axios = require('axios');
-const path = require('path'); // Naya module joddna hai
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+// Socket.io config with CORS for global access
+const io = new Server(server, { 
+    cors: { origin: "*" },
+    transports: ['websocket', 'polling']
+});
 
-// --- SETTINGS FOR RENDER (INDEX.HTML DIKHANE KE LIYE) ---
-app.use(express.static(__dirname)); // Static files (HTML, CSS) serve karne ke liye
+// --- YE SABSE ZAROORI HAI: INDEX.HTML DIKHANE KE LIYE ---
+// Sabse pehle static files setup karein
+app.use(express.static(path.join(__dirname)));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// Root route jo hamesha index.html hi dikhayega
+app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'index.html'));
 });
 
 // --- MQTT & SHEETS CONFIG ---
@@ -42,6 +48,6 @@ client.on('message', (topic, message) => {
     }
 });
 
-// RENDER APNA PORT DETA HAI, AGAR NAHI TOH 3000 USE KAREGA
+// RENDER APNA PORT DETA HAI
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
