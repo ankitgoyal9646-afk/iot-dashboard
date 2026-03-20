@@ -76,7 +76,7 @@
         });
 
         // Ise abhi khali chhodein, Render se link milne par yahan daalenge
-        const socket = io("https://your-app-name.onrender.com");
+        const socket = io("https://ankit-iot-hub.onrender.com");
         socket.on("iot_update", (data) => {
             const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
             document.getElementById('v-t').innerText = parseFloat(data.temp).toFixed(1);
