@@ -76,7 +76,10 @@
         });
 
         // Ise abhi khali chhodein, Render se link milne par yahan daalenge
-        const socket = io("https://ankit-iot-hub.onrender.com");
+        // --- YEH SABSE ZAROORI HAI PHONE KE LIYE ---
+        const socket = io("https://ankit-iot-hub.onrender.com", {
+            transports: ['websocket', 'polling']
+        });
         socket.on("iot_update", (data) => {
             const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
             document.getElementById('v-t').innerText = parseFloat(data.temp).toFixed(1);
