@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
 
 // --- CONFIG ---
 const MQTT_URL = "mqtt://otplai.com";
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1_i_YidrwDdyhPmpN7uvQF0cZ4LzK_uNcrkxnD4P6OTqdsnoJl-A_o6y3Fnq9vxvyyQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzVadvRhaBtJHUyiAfzdZIh0RotBLMPT-HsCTaBFlLUFDpx5MGvwSruHOfrZOxpgWpHAg/exec";
 
 const client = mqtt.connect(MQTT_URL, { username: "oxmo", password: "123456789" });
 
