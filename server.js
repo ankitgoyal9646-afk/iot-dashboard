@@ -7,22 +7,19 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-// Socket.io config with CORS for global access
 const io = new Server(server, { 
     cors: { origin: "*" },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'] 
 });
 
-// --- YE SABSE ZAROORI HAI: INDEX.HTML DIKHANE KE LIYE ---
-// Sabse pehle static files setup karein
-app.use(express.static(path.join(__dirname)));
+// Static files serve karne ke liye (Important for Render)
+app.use(express.static(__dirname));
 
-// Root route jo hamesha index.html hi dikhayega
-app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, 'index.html'));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- MQTT & SHEETS CONFIG ---
+// --- CONFIG ---
 const MQTT_URL = "mqtt://otplai.com";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1_i_YidrwDdyhPmpN7uvQF0cZ4LzK_uNcrkxnD4P6OTqdsnoJl-A_o6y3Fnq9vxvyyQ/exec";
 
@@ -31,7 +28,7 @@ const client = mqtt.connect(MQTT_URL, { username: "oxmo", password: "123456789" 
 let dataBuffer = { temp: null, hum: null };
 
 client.on('connect', () => {
-    console.log("✅ Backend Bridge Ready");
+    console.log("✅ Backend Bridge Connected to MQTT");
     client.subscribe("oxmo/ankit/secure/#");
 });
 
@@ -40,15 +37,19 @@ client.on('message', (topic, message) => {
     if (topic.includes("temp")) dataBuffer.temp = val;
     if (topic.includes("hum")) dataBuffer.hum = val;
 
+    // Jab dono mil jayein tabhi Dashboard aur Sheets ko bhejo
     if (dataBuffer.temp !== null && dataBuffer.hum !== null) {
+        console.log(`📤 Syncing: T:${dataBuffer.temp} H:${dataBuffer.hum}`);
         io.emit('iot_update', { temp: dataBuffer.temp, hum: dataBuffer.hum });
+
         axios.get(`${SCRIPT_URL}?temp=${dataBuffer.temp}&hum=${dataBuffer.hum}`)
-            .catch(err => console.log("Sheets Error"));
-        dataBuffer = { temp: null, hum: null };
+            .catch(err => console.log("Sheets Save Error"));
+
+        dataBuffer = { temp: null, hum: null }; // Clear buffer
     }
 });
 
-// RENDER APNA PORT DETA HAI
+// Render Port Fix (Important)
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server is live on port ${PORT}`);
