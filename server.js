@@ -12,34 +12,35 @@ const io = new Server(server, {
     transports: ['websocket', 'polling'] 
 });
 
+// --- CONFIG (Sabse Pehle) ---
+const MQTT_URL = "mqtt://otplai.com";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3krZni8yKpjmbwUwOeWJxWgGOfaKdJHiPqAQvaKqHsyANFzgB-l6__AARhAw5JltojQ/exec";
+
 // Static files serve karne ke liye
 app.use(express.static(__dirname));
 
+// 1. Dashboard Serve Karein
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// NEW: Render khud data fetch karke Dashboard ko dega (No Fetch Error)
+// 2. GET HISTORY (Proxy Route)
 app.get('/get-history', async (req, res) => {
     try {
+        console.log("📥 Dashboard requested history via Render Proxy");
         let url = SCRIPT_URL;
-        // Agar filter parameters hain toh unhe add karo
         if (req.query.start && req.query.end) {
             url += `?start=${req.query.start}&end=${req.query.end}`;
         }
         const response = await axios.get(url);
-        res.json(response.data); // Render data browser ko bhej dega
+        res.json(response.data); 
     } catch (error) {
-        console.log("History Fetch Error:", error.message);
+        console.log("❌ History Proxy Error:", error.message);
         res.status(500).json({ error: "Failed to fetch history" });
     }
 });
 
-// --- CONFIG ---
-const MQTT_URL = "mqtt://otplai.com";
-// ZAROORI: Yahan wahi URL rakhein jo Google Script ki 'New Deployment' se mila hai
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3krZni8yKpjmbwUwOeWJxWgGOfaKdJHiPqAQvaKqHsyANFzgB-l6__AARhAw5JltojQ/exec";
-
+// --- MQTT SETUP ---
 const client = mqtt.connect(MQTT_URL, { 
     username: "oxmo", 
     password: "123456789",
@@ -53,47 +54,36 @@ client.on('connect', () => {
     client.subscribe("oxmo/ankit/secure/#");
 });
 
-// 1. ESP32 se Data Dashboard aur Sheets tak bhejna
 client.on('message', (topic, message) => {
     const val = message.toString();
-    
     if (topic.includes("temp")) dataBuffer.temp = val;
     if (topic.includes("hum")) dataBuffer.hum = val;
 
-    // Jab dono mil jayein tabhi Dashboard aur Sheets ko bhejo
     if (dataBuffer.temp !== null && dataBuffer.hum !== null) {
-        console.log(`📤 Syncing Sensor Data: T:${dataBuffer.temp} H:${dataBuffer.hum}`);
-        
-        // Dashboard ko data bhejo
+        console.log(`📤 Syncing: T:${dataBuffer.temp} H:${dataBuffer.hum}`);
         io.emit('iot_update', { type: 'temp', val: dataBuffer.temp });
         io.emit('iot_update', { type: 'hum', val: dataBuffer.hum });
 
-        // Google Sheets mein Sensor data save karein
         axios.get(`${SCRIPT_URL}?temp=${dataBuffer.temp}&hum=${dataBuffer.hum}`)
             .catch(err => console.log("Sheets Sensor Log Error"));
 
-        dataBuffer = { temp: null, hum: null }; // Clear buffer
+        dataBuffer = { temp: null, hum: null };
     }
 });
 
-// 2. DASHBOARD SE COMMAND ESP32 TAK BHEJNA + SHEETS LOGGING
+// --- SOCKET CONNECTION ---
 io.on('connection', (socket) => {
     console.log("📱 Dashboard Connected to Socket");
-
     socket.on('led_command', (status) => {
-        console.log("💡 LED Command Received:", status);
-        
-        // A. ESP32 ko control karne ke liye MQTT par bhejo
+        console.log("💡 LED Command:", status);
         client.publish("oxmo/ankit/secure/cmd", status); 
-
-        // B. Google Sheets mein LED status log karne ke liye bhejo
         axios.get(`${SCRIPT_URL}?led=${status}`)
-            .then(() => console.log(`✅ LED ${status} Logged in Sheets`))
-            .catch(err => console.log("❌ Sheets LED Log Error"));
+            .then(() => console.log(`✅ LED ${status} Logged`))
+            .catch(err => console.log("❌ LED Log Error"));
     });
 });
 
-// Render Port Fix
+// --- SERVER LISTEN ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server is live on port ${PORT}`);
