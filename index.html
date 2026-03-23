@@ -82,9 +82,12 @@
     </div>
 
     <script>
+        // --- CONFIG ---
         const RENDER_URL = "https://ankit-iot-hub.onrender.com";
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3krZni8yKpjmbwUwOeWJxWgGOfaKdJHiPqAQvaKqHsyANFzgB-l6__AARhAw5JltojQ/exec";
+        // NOTE: Ye link server.js mein bhi update karein!
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwbxN7T3ulr753aNqu0QgYfvNM7sVWmG7hIbzbF3wEXZu2YiPAP2M0Om8XWU4sRpq5YxA/exec";
         
+        // Chart Setup
         var labels = [], temps = [], hums = [];
         var chart = new Chart(document.getElementById('myChart'), {
             type: 'line',
@@ -95,6 +98,7 @@
             options: { maintainAspectRatio: false, scales: { y: { beginAtZero: false } }, animation: false }
         });
 
+        // Socket Connection
         const socket = io(RENDER_URL, { transports: ['websocket', 'polling'] });
         
         socket.on("iot_update", (data) => {
@@ -115,15 +119,17 @@
             chart.update('none');
         });
 
+        // LED Toggle
         function toggleLED() {
-            let state = (document.getElementById('ledBtn').innerText === "OFF") ? "ON" : "OFF";
-            const btn = document.getElementById('ledBtn');
+            let btn = document.getElementById('ledBtn');
+            let state = (btn.innerText === "OFF") ? "ON" : "OFF";
             btn.innerText = state;
             btn.style.background = (state === "ON") ? "#eab308" : "#475569";
             btn.style.color = (state === "ON") ? "black" : "white";
             socket.emit('led_command', state);
         }
 
+        // --- HISTORY FETCH (VIA RENDER PROXY) ---
         async function fetchHistory(isFilter = false) {
             const body = document.getElementById('historyBody');
             document.getElementById('historyDrawer').classList.add('open');
@@ -147,7 +153,8 @@
                     return;
                 }
 
-                data.reverse().slice(0, 150).forEach(r => {
+                // Show latest 200 entries
+                data.reverse().slice(0, 200).forEach(r => {
                     let st = r.status || "Log";
                     let stColor = st.includes("ON") ? "#22c55e" : (st.includes("OFF") ? "#f43f5e" : "#38bdf8");
                     let rowColor = st.includes("LED") ? "style='background: rgba(234, 179, 8, 0.05)'" : "";
@@ -164,19 +171,26 @@
             }
         }
 
+        // --- FULL CSV DOWNLOAD (MODE=ALL) ---
         async function downloadFullReport() {
-            alert("Generating Full Report...");
+            alert("Generating Full Report (All 3000+ Rows)... Please wait.");
             try {
-                const res = await fetch("/get-history?mode=all"); // Backend se mangenge proxy ke liye
+                const res = await fetch("/get-history?mode=all"); 
                 const data = await res.json();
+                
                 let csv = "\ufeffTime (IST),Temperature (C),Humidity (%),Status\n";
-                data.forEach(r => { csv += `"${r.time}",${r.temp},${r.hum},${r.status || "N/A"}\n`; });
+                data.forEach(r => {
+                    csv += `"${r.time}",${r.temp},${r.hum},${r.status || "N/A"}\n`;
+                });
+
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `IoT_Full_Report.csv`;
+                link.download = `IoT_Complete_Report_${new Date().toLocaleDateString()}.csv`;
                 link.click();
-            } catch(e) { alert("Download failed."); }
+            } catch(e) { 
+                alert("Download failed. Check Server Logs."); 
+            }
         }
 
         function closeHistory() { document.getElementById('historyDrawer').classList.remove('open'); }
