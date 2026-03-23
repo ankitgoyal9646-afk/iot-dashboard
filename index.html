@@ -82,11 +82,9 @@
     </div>
 
     <script>
-        // --- CONFIG ---
         const RENDER_URL = "https://ankit-iot-hub.onrender.com";
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3krZni8yKpjmbwUwOeWJxWgGOfaKdJHiPqAQvaKqHsyANFzgB-l6__AARhAw5JltojQ/exec";
         
-        // Chart Setup
         var labels = [], temps = [], hums = [];
         var chart = new Chart(document.getElementById('myChart'), {
             type: 'line',
@@ -94,130 +92,91 @@
                 {label:'Temp', borderColor:'#f43f5e', data:[], tension: 0.4, fill: false},
                 {label:'Hum', borderColor:'#38bdf8', data:[], tension: 0.4, fill: false}
             ]},
-            options: { 
-                maintainAspectRatio: false, 
-                scales: { y: { beginAtZero: false } },
-                animation: false 
-            }
+            options: { maintainAspectRatio: false, scales: { y: { beginAtZero: false } }, animation: false }
         });
 
-        // Socket Connection
         const socket = io(RENDER_URL, { transports: ['websocket', 'polling'] });
         
         socket.on("iot_update", (data) => {
             const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
             const val = parseFloat(data.val);
-
             if(data.type === 'temp') {
                 document.getElementById('v-t').innerText = val.toFixed(1);
-                temps.push(val);
-                labels.push(time);
+                temps.push(val); labels.push(time);
             }
             if(data.type === 'hum') {
                 document.getElementById('v-h').innerText = val.toFixed(1);
                 hums.push(val);
             }
-            
             if(labels.length > 15) { labels.shift(); temps.shift(); hums.shift(); }
-            
             chart.data.labels = labels;
             chart.data.datasets[0].data = temps;
             chart.data.datasets[1].data = hums;
             chart.update('none');
         });
 
-        // LED Remote Logic
-        let ledState = "OFF";
         function toggleLED() {
-            ledState = (ledState === "OFF") ? "ON" : "OFF";
+            let state = (document.getElementById('ledBtn').innerText === "OFF") ? "ON" : "OFF";
             const btn = document.getElementById('ledBtn');
-            btn.innerText = ledState;
-            btn.style.background = (ledState === "ON") ? "#eab308" : "#475569";
-            btn.style.color = (ledState === "ON") ? "black" : "white";
-            socket.emit('led_command', ledState);
+            btn.innerText = state;
+            btn.style.background = (state === "ON") ? "#eab308" : "#475569";
+            btn.style.color = (state === "ON") ? "black" : "white";
+            socket.emit('led_command', state);
         }
 
-        // Optimized History Fetch
         async function fetchHistory(isFilter = false) {
-    const body = document.getElementById('historyBody');
-    document.getElementById('historyDrawer').classList.add('open');
-    body.innerHTML = "<tr><td colspan='4'>⌛ Loading from Server...</td></tr>";
+            const body = document.getElementById('historyBody');
+            document.getElementById('historyDrawer').classList.add('open');
+            body.innerHTML = "<tr><td colspan='4'>⌛ Loading from Server...</td></tr>";
 
-    // Ab hum direct Google par nahi, apne Render server (/get-history) par jayenge
-    let fetchUrl = "/get-history"; 
-    if(isFilter) {
-        const start = document.getElementById('startTime').value;
-        const end = document.getElementById('endTime').value;
-        if(!start || !end) { alert("Please select dates"); return; }
-        fetchUrl += `?start=${start}&end=${end}`;
-    }
+            let fetchUrl = "/get-history"; 
+            if(isFilter) {
+                const start = document.getElementById('startTime').value;
+                const end = document.getElementById('endTime').value;
+                if(!start || !end) { alert("Please select dates"); return; }
+                fetchUrl += `?start=${start}&end=${end}`;
+            }
 
-    try {
-        const res = await fetch(fetchUrl); 
-        const data = await res.json();
-        
-        body.innerHTML = "";
-        if(!data || data.length === 0) {
-            body.innerHTML = "<tr><td colspan='4'>No Data Found</td></tr>";
-            return;
-        }
-
-        data.reverse().slice(0, 150).forEach(r => {
-            let st = r.status || "Log";
-            let stColor = st.includes("ON") ? "#22c55e" : (st.includes("OFF") ? "#f43f5e" : "#38bdf8");
-            
-            body.innerHTML += `<tr>
-                <td>${r.time}</td>
-                <td>${(r.temp && r.temp !== "--") ? parseFloat(r.temp).toFixed(1) : "--"}</td>
-                <td>${(r.hum && r.hum !== "--") ? parseFloat(r.hum).toFixed(1) : "--"}</td>
-                <td style="color:${stColor}; font-weight:bold;">${st}</td>
-            </tr>`;
-        });
-    } catch(e) { 
-        body.innerHTML = "<tr><td colspan='4' style='color:red'>Server Error! Try Refreshing.</td></tr>"; 
-    }
-}
+            try {
+                const res = await fetch(fetchUrl); 
+                const data = await res.json();
+                body.innerHTML = "";
                 
-                // Show latest 150 entries for performance
-                const displayData = data.length > 150 ? data.slice(-150) : data;
-                displayData.reverse().forEach(r => {
-                    let st = r.status || "Sensor Log";
-                    let isLED = st.includes("LED");
-                    let rowColor = isLED ? "style='background: rgba(234, 179, 8, 0.05)'" : "";
-                    let stColor = st.includes("ON") ? "#22c55e" : (st.includes("OFF") ? "#f43f5e" : "#38bdf8");
+                if(!data || data.length === 0) {
+                    body.innerHTML = "<tr><td colspan='4'>No Data Found</td></tr>";
+                    return;
+                }
 
-                    // Safe value formatting
-                    let tVal = (r.temp !== "--" && r.temp) ? parseFloat(r.temp).toFixed(1) + "°C" : "--";
-                    let hVal = (r.hum !== "--" && r.hum) ? parseFloat(r.hum).toFixed(1) + "%" : "--";
+                data.reverse().slice(0, 150).forEach(r => {
+                    let st = r.status || "Log";
+                    let stColor = st.includes("ON") ? "#22c55e" : (st.includes("OFF") ? "#f43f5e" : "#38bdf8");
+                    let rowColor = st.includes("LED") ? "style='background: rgba(234, 179, 8, 0.05)'" : "";
 
                     body.innerHTML += `<tr ${rowColor}>
                         <td>${r.time}</td>
-                        <td>${tVal}</td>
-                        <td>${hVal}</td>
+                        <td>${(r.temp && r.temp !== "--") ? parseFloat(r.temp).toFixed(1) + "°C" : "--"}</td>
+                        <td>${(r.hum && r.hum !== "--") ? parseFloat(r.hum).toFixed(1) + "%" : "--"}</td>
                         <td style="color:${stColor}; font-weight:bold;">${st}</td>
                     </tr>`;
                 });
             } catch(e) { 
-                console.error("Fetch Error:", e);
-                body.innerHTML = "<tr><td colspan='4' style='color:red'>Fetch Error! Check Script URL</td></tr>"; 
+                body.innerHTML = "<tr><td colspan='4' style='color:red'>Server Error! Try Refreshing.</td></tr>"; 
             }
         }
 
         async function downloadFullReport() {
-            alert("Generating Full Report... Please wait.");
+            alert("Generating Full Report...");
             try {
-                const res = await fetch(SCRIPT_URL + "?mode=all");
+                const res = await fetch("/get-history?mode=all"); // Backend se mangenge proxy ke liye
                 const data = await res.json();
                 let csv = "\ufeffTime (IST),Temperature (C),Humidity (%),Status\n";
-                data.forEach(r => {
-                    csv += `"${r.time}",${r.temp},${r.hum},${r.status || "N/A"}\n`;
-                });
+                data.forEach(r => { csv += `"${r.time}",${r.temp},${r.hum},${r.status || "N/A"}\n`; });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `IoT_Full_Report_${new Date().toLocaleDateString()}.csv`;
+                link.download = `IoT_Full_Report.csv`;
                 link.click();
-            } catch(e) { alert("Download failed. Check internet."); }
+            } catch(e) { alert("Download failed."); }
         }
 
         function closeHistory() { document.getElementById('historyDrawer').classList.remove('open'); }
