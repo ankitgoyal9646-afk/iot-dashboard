@@ -19,6 +19,22 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// NEW: Render khud data fetch karke Dashboard ko dega (No Fetch Error)
+app.get('/get-history', async (req, res) => {
+    try {
+        let url = SCRIPT_URL;
+        // Agar filter parameters hain toh unhe add karo
+        if (req.query.start && req.query.end) {
+            url += `?start=${req.query.start}&end=${req.query.end}`;
+        }
+        const response = await axios.get(url);
+        res.json(response.data); // Render data browser ko bhej dega
+    } catch (error) {
+        console.log("History Fetch Error:", error.message);
+        res.status(500).json({ error: "Failed to fetch history" });
+    }
+});
+
 // --- CONFIG ---
 const MQTT_URL = "mqtt://otplai.com";
 // ZAROORI: Yahan wahi URL rakhein jo Google Script ki 'New Deployment' se mila hai
