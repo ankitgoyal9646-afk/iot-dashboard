@@ -15,7 +15,7 @@ const io = new Server(server, {
 // --- CONFIG ---
 const MQTT_URL = "mqtt://otplai.com";
 // ZAROORI: Check kijiye ki ye URL aapke "New Deployment" wala hi hai na?
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwbxN7T3ulr753aNqu0QgYfvNM7sVWmG7hIbzbF3wEXZu2YiPAP2M0Om8XWU4sRpq5YxA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiU0korm717SkTQvGDi2RYX7px3-6XDuGccRxScnrDOch9dq6xR2bKDvuoHo8OFRH9xg/exec";
 
 app.use(express.static(__dirname));
 
