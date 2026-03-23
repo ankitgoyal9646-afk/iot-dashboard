@@ -139,26 +139,44 @@
 
         // Optimized History Fetch
         async function fetchHistory(isFilter = false) {
-            const body = document.getElementById('historyBody');
-            document.getElementById('historyDrawer').classList.add('open');
-            body.innerHTML = "<tr><td colspan='4'>⌛ Fetching Data...</td></tr>";
+    const body = document.getElementById('historyBody');
+    document.getElementById('historyDrawer').classList.add('open');
+    body.innerHTML = "<tr><td colspan='4'>⌛ Loading from Server...</td></tr>";
 
-            let fetchUrl = SCRIPT_URL;
-            if(isFilter) {
-                const start = document.getElementById('startTime').value;
-                const end = document.getElementById('endTime').value;
-                if(!start || !end) { alert("Please select both dates"); return; }
-                fetchUrl += `?start=${start}&end=${end}`;
-            }
+    // Ab hum direct Google par nahi, apne Render server (/get-history) par jayenge
+    let fetchUrl = "/get-history"; 
+    if(isFilter) {
+        const start = document.getElementById('startTime').value;
+        const end = document.getElementById('endTime').value;
+        if(!start || !end) { alert("Please select dates"); return; }
+        fetchUrl += `?start=${start}&end=${end}`;
+    }
 
-            try {
-                const res = await fetch(fetchUrl);
-                const data = await res.json();
-                body.innerHTML = "";
-                if(!data || data.length === 0) {
-                    body.innerHTML = "<tr><td colspan='4'>No Data Found</td></tr>";
-                    return;
-                }
+    try {
+        const res = await fetch(fetchUrl); 
+        const data = await res.json();
+        
+        body.innerHTML = "";
+        if(!data || data.length === 0) {
+            body.innerHTML = "<tr><td colspan='4'>No Data Found</td></tr>";
+            return;
+        }
+
+        data.reverse().slice(0, 150).forEach(r => {
+            let st = r.status || "Log";
+            let stColor = st.includes("ON") ? "#22c55e" : (st.includes("OFF") ? "#f43f5e" : "#38bdf8");
+            
+            body.innerHTML += `<tr>
+                <td>${r.time}</td>
+                <td>${(r.temp && r.temp !== "--") ? parseFloat(r.temp).toFixed(1) : "--"}</td>
+                <td>${(r.hum && r.hum !== "--") ? parseFloat(r.hum).toFixed(1) : "--"}</td>
+                <td style="color:${stColor}; font-weight:bold;">${st}</td>
+            </tr>`;
+        });
+    } catch(e) { 
+        body.innerHTML = "<tr><td colspan='4' style='color:red'>Server Error! Try Refreshing.</td></tr>"; 
+    }
+}
                 
                 // Show latest 150 entries for performance
                 const displayData = data.length > 150 ? data.slice(-150) : data;
