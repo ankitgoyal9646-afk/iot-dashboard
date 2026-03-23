@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
 
 // --- CONFIG ---
 const MQTT_URL = "mqtt://otplai.com";
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeTZdTDRnE6A1rQI2VjQUrv53T30yy5tpIEo33onG2TX20azJRpxciHQ7Js5NXVhw56w/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbynxCqhPehBb3rX49W2azvZmV4p_u0rKSFkffdfm9G3LpCxw6VhIJg6iDBtPT4dVKM7Ww/exec";
 
 const client = mqtt.connect(MQTT_URL, { 
     username: "oxmo", 
@@ -45,27 +45,34 @@ client.on('message', (topic, message) => {
 
     // Jab dono mil jayein tabhi Dashboard aur Sheets ko bhejo
     if (dataBuffer.temp !== null && dataBuffer.hum !== null) {
-        console.log(`📤 Syncing: T:${dataBuffer.temp} H:${dataBuffer.hum}`);
+        console.log(`📤 Syncing Sensor Data: T:${dataBuffer.temp} H:${dataBuffer.hum}`);
         
-        // Dashboard ko data bhejo (Correct Format)
+        // Dashboard ko data bhejo
         io.emit('iot_update', { type: 'temp', val: dataBuffer.temp });
         io.emit('iot_update', { type: 'hum', val: dataBuffer.hum });
 
-        // Google Sheets mein save karein
+        // Google Sheets mein Sensor data save karein
         axios.get(`${SCRIPT_URL}?temp=${dataBuffer.temp}&hum=${dataBuffer.hum}`)
-            .catch(err => console.log("Sheets Save Error"));
+            .catch(err => console.log("Sheets Sensor Log Error"));
 
         dataBuffer = { temp: null, hum: null }; // Clear buffer
     }
 });
 
-// 2. DASHBOARD SE COMMAND ESP32 TAK BHEJNA
+// 2. DASHBOARD SE COMMAND ESP32 TAK BHEJNA + SHEETS LOGGING (NEW)
 io.on('connection', (socket) => {
     console.log("📱 Dashboard Connected to Socket");
 
     socket.on('led_command', (status) => {
         console.log("💡 LED Command Received:", status);
+        
+        // A. ESP32 ko control karne ke liye MQTT par bhejo
         client.publish("oxmo/ankit/secure/cmd", status); 
+
+        // B. Google Sheets mein LED status log karne ke liye bhejo
+        axios.get(`${SCRIPT_URL}?led=${status}`)
+            .then(() => console.log(`✅ LED ${status} Logged in Sheets`))
+            .catch(err => console.log("❌ Sheets LED Log Error"));
     });
 });
 
