@@ -21,7 +21,8 @@ app.get('/', (req, res) => {
 
 // --- CONFIG ---
 const MQTT_URL = "mqtt://otplai.com";
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbynxCqhPehBb3rX49W2azvZmV4p_u0rKSFkffdfm9G3LpCxw6VhIJg6iDBtPT4dVKM7Ww/exec";
+// ZAROORI: Yahan wahi URL rakhein jo Google Script ki 'New Deployment' se mila hai
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3krZni8yKpjmbwUwOeWJxWgGOfaKdJHiPqAQvaKqHsyANFzgB-l6__AARhAw5JltojQ/exec";
 
 const client = mqtt.connect(MQTT_URL, { 
     username: "oxmo", 
@@ -59,7 +60,7 @@ client.on('message', (topic, message) => {
     }
 });
 
-// 2. DASHBOARD SE COMMAND ESP32 TAK BHEJNA + SHEETS LOGGING (NEW)
+// 2. DASHBOARD SE COMMAND ESP32 TAK BHEJNA + SHEETS LOGGING
 io.on('connection', (socket) => {
     console.log("📱 Dashboard Connected to Socket");
 
