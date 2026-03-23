@@ -14,11 +14,15 @@
         .value { font-size: 1.8rem; font-weight: bold; color: #38bdf8; }
         .chart-box { background: #1e293b; padding: 15px; border-radius: 20px; max-width: 800px; margin: 15px auto; height: 300px; }
         
+        /* LED Control Card */
+        .led-card { background: #1e293b; padding: 20px; border-radius: 15px; max-width: 250px; margin: 15px auto; border: 2px solid #eab308; box-shadow: 0 4px 15px rgba(234, 179, 8, 0.2); }
+        #ledBtn { width: 100%; font-size: 1.1rem; background: #475569; margin-top: 10px; }
+
         /* Filter Styles */
         .filter-box { background: #1e293b; padding: 15px; border-radius: 12px; max-width: 500px; margin: 10px auto; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; border: 1px solid #334155; }
         input[type="datetime-local"] { padding: 8px; border-radius: 5px; border: none; background: #0f172a; color: white; font-size: 0.8rem; }
         
-        .btn { border: none; padding: 10px 18px; border-radius: 50px; cursor: pointer; color: white; font-weight: bold; font-size: 0.8rem; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+        .btn { border: none; padding: 10px 18px; border-radius: 50px; cursor: pointer; color: white; font-weight: bold; font-size: 0.8rem; transition: 0.3s; display: flex; align-items: center; gap: 8px; justify-content: center; }
         
         /* Side Drawer */
         .side-drawer { position: fixed; top: 0; right: -420px; width: 400px; height: 100%; background: #1e293b; transition: 0.4s; z-index: 1000; display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
@@ -39,6 +43,11 @@
     </div>
 
     <div class="chart-box"><canvas id="myChart"></canvas></div>
+
+    <div class="led-card">
+        <div><i class="fa-solid fa-lightbulb"></i> <b>LED REMOTE</b></div>
+        <button id="ledBtn" class="btn" onclick="toggleLED()">OFF</button>
+    </div>
 
     <div class="filter-box">
         <div><small>From:</small><br><input type="datetime-local" id="startTime"></div>
@@ -65,6 +74,7 @@
     </div>
 
     <script>
+        // --- CONFIG ---
         const RENDER_URL = "https://ankit-iot-hub.onrender.com";
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeTZdTDRnE6A1rQI2VjQUrv53T30yy5tpIEo33onG2TX20azJRpxciHQ7Js5NXVhw56w/exec";
         
@@ -73,24 +83,53 @@
         var chart = new Chart(document.getElementById('myChart'), {
             type: 'line',
             data: { labels: [], datasets: [
-                {label:'Temp', borderColor:'#f43f5e', data:[], tension: 0.4},
-                {label:'Hum', borderColor:'#38bdf8', data:[], tension: 0.4}
+                {label:'Temp', borderColor:'#f43f5e', data:[], tension: 0.4, fill: false},
+                {label:'Hum', borderColor:'#38bdf8', data:[], tension: 0.4, fill: false}
             ]},
-            options: { maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
+            options: { 
+                maintainAspectRatio: false, 
+                scales: { y: { beginAtZero: false } },
+                animation: false 
+            }
         });
 
         // Socket Connection
         const socket = io(RENDER_URL, { transports: ['websocket', 'polling'] });
+        
         socket.on("iot_update", (data) => {
             const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
-            document.getElementById('v-t').innerText = parseFloat(data.temp).toFixed(1);
-            document.getElementById('v-h').innerText = parseFloat(data.hum).toFixed(1);
+            const val = parseFloat(data.val);
+
+            if(data.type === 'temp') {
+                document.getElementById('v-t').innerText = val.toFixed(1);
+                temps.push(val);
+                labels.push(time);
+            }
+            if(data.type === 'hum') {
+                document.getElementById('v-h').innerText = val.toFixed(1);
+                hums.push(val);
+            }
             
-            labels.push(time); temps.push(data.temp); hums.push(data.hum);
             if(labels.length > 15) { labels.shift(); temps.shift(); hums.shift(); }
-            chart.data.labels = labels; chart.data.datasets[0].data = temps; chart.data.datasets[1].data = hums;
+            
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = temps;
+            chart.data.datasets[1].data = hums;
             chart.update('none');
         });
+
+        // LED Remote Logic
+        let ledState = "OFF";
+        function toggleLED() {
+            ledState = (ledState === "OFF") ? "ON" : "OFF";
+            const btn = document.getElementById('ledBtn');
+            btn.innerText = ledState;
+            btn.style.background = (ledState === "ON") ? "#eab308" : "#475569";
+            btn.style.color = (ledState === "ON") ? "black" : "white";
+            
+            // Server ko command bhejo
+            socket.emit('led_command', ledState);
+        }
 
         // Optimized History Fetch
         async function fetchHistory(isFilter = false) {
@@ -110,11 +149,15 @@
                 const res = await fetch(fetchUrl);
                 const data = await res.json();
                 body.innerHTML = "";
-                if(data.length === 0) body.innerHTML = "<tr><td colspan='3'>No Data Found</td></tr>";
+                if(!data || data.length === 0) {
+                    body.innerHTML = "<tr><td colspan='3'>No Data Found</td></tr>";
+                    return;
+                }
                 
-                data.reverse().forEach(r => {
-                    let t = new Date(r.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12:false });
-                    body.innerHTML += `<tr><td>${t}</td><td>${parseFloat(r.temp).toFixed(1)}°C</td><td>${parseFloat(r.hum).toFixed(1)}%</td></tr>`;
+                // Dashboard crash protection: latest 100 logs dikhao
+                const displayData = data.length > 100 ? data.slice(-100) : data;
+                displayData.reverse().forEach(r => {
+                    body.innerHTML += `<tr><td>${r.time}</td><td>${parseFloat(r.temp).toFixed(1)}°C</td><td>${parseFloat(r.hum).toFixed(1)}%</td></tr>`;
                 });
             } catch(e) { body.innerHTML = "<tr><td colspan='3' style='color:red'>Fetch Error!</td></tr>"; }
         }
@@ -126,8 +169,7 @@
                 const data = await res.json();
                 let csv = "\ufeffTime (IST),Temperature (C),Humidity (%)\n";
                 data.forEach(r => {
-                    let t = new Date(r.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-                    csv += `"${t}",${r.temp},${r.hum}\n`;
+                    csv += `"${r.time}",${r.temp},${r.hum}\n`;
                 });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
